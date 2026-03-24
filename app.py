@@ -1,9 +1,10 @@
 import json
 import os
+import xml.etree.ElementTree as ET
+from urllib.request import urlopen
 
 import pandas as pd
 import streamlit as st
-import yfinance as yf
 from openai import OpenAI
 
 st.set_page_config(page_title="Stock News Sentiment", page_icon="📰")
@@ -12,8 +13,15 @@ st.title("Stock News Sentiment")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def get_headlines(ticker: str, limit: int = 10) -> list[str]:
-    items = yf.Ticker(ticker).news or []
-    return [i.get("title", "").strip() for i in items if i.get("title")][:limit]
+    url = f"https://news.google.com/rss/search?q={ticker}+stock"
+    with urlopen(url, timeout=10) as response:
+        rss_feed = response.read()
+    root = ET.fromstring(rss_feed)
+    return [
+        title.text.strip()
+        for title in root.findall("./channel/item/title")
+        if title.text and title.text.strip()
+    ][:limit]
 
 
 def analyze(headlines: list[str]) -> list[dict]:
